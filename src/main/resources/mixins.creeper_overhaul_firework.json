@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "plus.dragons.creeperoverhaulfirework.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "minVersion": "0.8",
+  "mixins": [
+    "MixinBaseCreeper",
+    "SummonCloudWithEffectsMethodInvoker"
+  ],
+  "server": [],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "mixins.creeper_overhaul_firework.refmap.json"
+}
