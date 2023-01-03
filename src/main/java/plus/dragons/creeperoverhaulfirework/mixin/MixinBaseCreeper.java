@@ -16,6 +16,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.ProtectionEnchantment;
@@ -32,14 +33,17 @@ import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.network.PacketDistributor;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import software.bernie.geckolib3.core.IAnimatable;
 import tech.thatgravyboat.creeperoverhaul.common.entity.base.BaseCreeper;
-import tech.thatgravyboat.creeperoverhaul.common.utils.PlatformUtils;
+import tech.thatgravyboat.creeperoverhaul.common.entity.base.CreeperType;
 
 import java.util.*;
 import java.util.function.Function;
@@ -49,10 +53,14 @@ import java.util.stream.Stream;
 
 @Mixin(BaseCreeper.class)
 public abstract class MixinBaseCreeper extends Creeper implements IAnimatable {
-    public MixinBaseCreeper(EntityType<? extends Creeper> entityType, Level level) {
-        super(entityType, level);
-    }
 
+    @Final
+    @Shadow(remap = false)
+    public CreeperType type;
+
+    protected MixinBaseCreeper(EntityType<? extends Creeper> p_33002_, Level p_33003_) {
+        super(p_33002_, p_33003_);
+    }
 
     @Inject(method = "explode", at = @At("HEAD"), cancellable = true, remap = false)
     private void injected(CallbackInfo ci) {
@@ -60,7 +68,7 @@ public abstract class MixinBaseCreeper extends Creeper implements IAnimatable {
         if (Configuration.ACTIVE_EXPLOSION_TO_FIREWORK.get() && new Random(self.getUUID().getLeastSignificantBits()).nextDouble() < Configuration.ACTIVE_EXPLOSION_TURNING_PROBABILITY.get()) {
             if (!self.getLevel().isClientSide()) {
                 sendEffectPacket(self.getLevel(), self.blockPosition());
-                Explosion.BlockInteraction interaction = PlatformUtils.getInteractionForCreeper(self);
+                Explosion.BlockInteraction interaction = ForgeEventFactory.getMobGriefingEvent(this.level, this) ? Explosion.BlockInteraction.DESTROY : Explosion.BlockInteraction.NONE;
                 if (Configuration.ACTIVE_EXPLOSION_HURT_CREATURE.get())
                     simulateExplodeHurtMob();
                 if (Configuration.ACTIVE_EXPLOSION_DESTROY_BLOCK.get() && self.getLevel().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING))
@@ -79,7 +87,7 @@ public abstract class MixinBaseCreeper extends Creeper implements IAnimatable {
         // A compromise
         // super.die(damageSource);
         if (Configuration.DEATH_TO_FIREWORK.get() && new Random(self.getUUID().getLeastSignificantBits()).nextDouble() < Configuration.DEATH_EXPLOSION_TURNING_PROBABILITY.get()) {
-            Explosion.BlockInteraction interaction = PlatformUtils.getInteractionForCreeper(self);
+            Explosion.BlockInteraction interaction = ForgeEventFactory.getMobGriefingEvent(this.level, this) ? Explosion.BlockInteraction.DESTROY : Explosion.BlockInteraction.NONE;
             if (!self.getLevel().isClientSide()) {
                 sendEffectPacket(self.getLevel(), self.blockPosition());
                 if (Configuration.DEATH_EXPLOSION_HURT_CREATURE.get())
@@ -132,10 +140,10 @@ public abstract class MixinBaseCreeper extends Creeper implements IAnimatable {
         }
         
         // Creeper Overhaul Part
-        if (!self.type.inflictingPotions().isEmpty()) {
+        if (!type.inflictingPotions().isEmpty()) {
             var players = victims.stream().filter(livingEntity -> livingEntity instanceof Player).toList();
             players.forEach((player) -> {
-                Collection<MobEffectInstance> inflictingPotions = self.type.inflictingPotions().stream().map(MobEffectInstance::new).toList();
+                Collection<MobEffectInstance> inflictingPotions = type.inflictingPotions().stream().map(MobEffectInstance::new).toList();
                 inflictingPotions.forEach(player::addEffect);
             });
         }
@@ -221,32 +229,33 @@ public abstract class MixinBaseCreeper extends Creeper implements IAnimatable {
             for (Pair<ItemStack, BlockPos> itemStackBlockPosPair : blockDropList) {
                 Block.popResource(self.getLevel(), itemStackBlockPosPair.getSecond(), itemStackBlockPosPair.getFirst());
             }
-        }
 
-        // Creeper Overhaul Part
-        if (!self.type.replacer().isEmpty()) {
-            Set<Map.Entry<Predicate<BlockState>, Function<RandomSource, BlockState>>> entries = self.type.replacer().entrySet();
-            explosionRange.stream().map(BlockPos::below).forEach((pos) -> {
-                BlockState state = this.level.getBlockState(pos);
-                Iterator var4 = entries.iterator();
+            // Creeper Overhaul Part
+            if (!type.replacer().isEmpty()) {
+                Set<Map.Entry<Predicate<BlockState>, Function<RandomSource, BlockState>>> entries = type.replacer().entrySet();
+                simulateExplosionForParameter.getToBlow().stream().map(BlockPos::below).forEach((pos) -> {
+                    BlockState state = this.level.getBlockState(pos);
+                    Iterator var4 = entries.iterator();
 
-                while(var4.hasNext()) {
-                    Map.Entry<Predicate<BlockState>, Function<RandomSource, BlockState>> entry = (Map.Entry)var4.next();
-                    if (((Predicate)entry.getKey()).test(state)) {
-                        BlockState newState = (BlockState)((Function)entry.getValue()).apply(this.random);
-                        if (newState != null) {
-                            this.level.setBlock(pos, newState, 3);
-                            break;
+                    while(var4.hasNext()) {
+                        Map.Entry<Predicate<BlockState>, Function<RandomSource, BlockState>> entry = (Map.Entry)var4.next();
+                        if (((Predicate)entry.getKey()).test(state)) {
+                            BlockState newState = (BlockState)((Function)entry.getValue()).apply(this.random);
+                            if (newState != null) {
+                                this.level.setBlock(pos, newState, 3);
+                                break;
+                            }
                         }
                     }
-                }
-            });
+
+                });
+            }
         }
     }
 
     private void spawnPotionCloud(){
         var self = ((BaseCreeper) (Object) this);
-        Stream<MobEffectInstance> potions = Stream.concat(this.getActiveEffects().stream().map(MobEffectInstance::new), self.type.potionsWhenDead().stream().map(MobEffectInstance::new));
+        Stream<MobEffectInstance> potions = Stream.concat(this.getActiveEffects().stream().map(MobEffectInstance::new), type.potionsWhenDead().stream().map(MobEffectInstance::new));
         ((SummonCloudWithEffectsMethodInvoker) self).invokeSummonCloudWithEffects(potions.toList());
     }
     

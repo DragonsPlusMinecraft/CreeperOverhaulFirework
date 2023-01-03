@@ -16,7 +16,7 @@ apply plugin: 'maven-publish'
 // MixinGradle:
 apply plugin: 'org.spongepowered.mixin'
 
-version = '1.0.0'
+version = '1.0.2'
 group = 'plus.dragons.creeperoverhaulfirework' // http://maven.apache.org/guides/mini/guide-naming-conventions.html
 archivesBaseName = 'creeper_overhaul_firework'
 
@@ -144,7 +144,7 @@ dependencies {
     // Specify the version of Minecraft to use, If this is any group other then 'net.minecraft' it is assumed
     // that the dep is a ForgeGradle 'patcher' dependency. And it's patches will be applied.
     // The userdev artifact is a special name and will get all sorts of transformations applied to it.
-    minecraft 'net.minecraftforge:forge:1.19.2-43.1.1'
+    minecraft 'net.minecraftforge:forge:1.19.2-43.2.0'
 
     // Apply Mixin AP
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
@@ -171,7 +171,7 @@ dependencies {
     implementation fg.deobf('software.bernie.geckolib:geckolib-forge-1.19:3.1.21')
 
     implementation fg.deobf('curse.maven:creeper_firework-558439:3925663')  // 1.2.0
-    implementation fg.deobf('curse.maven:creeper_overhaul-561625:3953180')  // 2.0.4
+    implementation fg.deobf('curse.maven:creeper_overhaul-561625:4063098')  // 2.0.5
 
 }
 

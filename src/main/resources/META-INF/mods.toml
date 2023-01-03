@@ -74,6 +74,6 @@ A Creeper Firework Addon for Creeper Overhaul mod
     modId="creeperoverhaul"
     mandatory=true
     # HAHA
-    versionRange="[1.0.0,)"
+    versionRange="[2.0.5,)"
     ordering="AFTER"
     side="BOTH"
